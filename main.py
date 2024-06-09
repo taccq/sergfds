@@ -11,6 +11,10 @@ from TwitchChannelPointsMiner.classes.Pushover import Pushover
 from TwitchChannelPointsMiner.classes.Settings import Priority, Events, FollowersOrder
 from TwitchChannelPointsMiner.classes.entities.Streamer import Streamer, StreamerSettings
 
+from keep_alive import keep_alive
+
+keep_alive()
+
 # Função para carregar as credenciais do arquivo config.json
 def carregar_credenciais():
     with open("config.json", "r") as arquivo_config:
