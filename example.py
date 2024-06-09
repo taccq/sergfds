@@ -6,6 +6,7 @@ from TwitchChannelPointsMiner import TwitchChannelPointsMiner
 from TwitchChannelPointsMiner.logger import LoggerSettings, ColorPalette
 from TwitchChannelPointsMiner.classes.Chat import ChatPresence
 from TwitchChannelPointsMiner.classes.Discord import Discord
+from TwitchChannelPointsMiner.classes.Webhook import Webhook
 from TwitchChannelPointsMiner.classes.Telegram import Telegram
 from TwitchChannelPointsMiner.classes.Matrix import Matrix
 from TwitchChannelPointsMiner.classes.Pushover import Pushover
@@ -20,7 +21,7 @@ twitch_miner = TwitchChannelPointsMiner(
     priority=[                                  # Custom priority in this case for example:
         Priority.STREAK,                        # - We want first of all to catch all watch streak from all streamers
         Priority.DROPS,                         # - When we don't have anymore watch streak to catch, wait until all drops are collected over the streamers
-        Priority.ORDER                          # - When we have all of the drops claimed and no watch-streak available, use the order priority (POINTS_ASCENDING, POINTS_DESCEDING)
+        Priority.ORDER                          # - When we have all of the drops claimed and no watch-streak available, use the order priority (POINTS_ASCENDING, POINTS_DESCENDING)
     ],
     enable_analytics=False,                     # Disables Analytics if False. Disabling it significantly reduces memory consumption
     disable_ssl_cert_verification=False,        # Set to True at your own risk and only to fix SSL: CERTIFICATE_VERIFY_FAILED error
@@ -28,7 +29,7 @@ twitch_miner = TwitchChannelPointsMiner(
     logger_settings=LoggerSettings(
         save=True,                              # If you want to save logs in a file (suggested)
         console_level=logging.INFO,             # Level of logs - use logging.DEBUG for more info
-        console_username=False,                 # Adds a username to every console log line if True. Useful when you have many open consoles with different accounts
+        console_username=False,                 # Adds a username to every console log line if True. Also adds it to Telegram, Discord, etc. Useful when you have several accounts
         auto_clear=True,                        # Create a file rotation handler with interval = 1D and backupCount = 7 if True (default)
         time_zone="",                           # Set a specific time zone for console and file loggers. Use tz database names. Example: "America/Denver"
         file_level=logging.DEBUG,               # Level of logs - If you think the log file it's too big, use logging.INFO
@@ -50,21 +51,27 @@ twitch_miner = TwitchChannelPointsMiner(
         discord=Discord(
             webhook_api="https://discord.com/api/webhooks/0123456789/0a1B2c3D4e5F6g7H8i9J",  # Discord Webhook URL
             events=[Events.STREAMER_ONLINE, Events.STREAMER_OFFLINE,
-            Events.BONUS_CLAIM, Events.GAIN_FOR_WATCH],                                  # Only these events will be sent to the chat
+                    Events.BET_LOSE, Events.CHAT_MENTION],                                  # Only these events will be sent to the chat
+        ),
+        webhook=Webhook(
+            endpoint="https://example.com/webhook",                                                                    # Webhook URL
+            method="GET",                                                                   # GET or POST
+            events=[Events.STREAMER_ONLINE, Events.STREAMER_OFFLINE,
+                    Events.BET_LOSE, Events.CHAT_MENTION],                                  # Only these events will be sent to the endpoint
         ),
         matrix=Matrix(
             username="twitch_miner",                                                   # Matrix username (without homeserver)
             password="...",                                                            # Matrix password
             homeserver="matrix.org",                                                   # Matrix homeserver
             room_id="...",                                                             # Room ID
-            events=[Events.STREAMER_ONLINE, Events.STREAMER_OFFLINE, Events.BET_LOSE], # Only these events will be sent to the chat
+            events=[Events.STREAMER_ONLINE, Events.STREAMER_OFFLINE, Events.BET_LOSE], # Only these events will be sent
         ),
         pushover=Pushover(
-            userkey="YOUR-ACCOUNT-TOKEN",                                             # Login to https://pushover.net/, the user token is on the main page.
-            token="YOUR-APPLICATION-TOKEN",                                           # Create a application on the website, and use the token shown in your application.
+            userkey="YOUR-ACCOUNT-TOKEN",                                             # Login to https://pushover.net/, the user token is on the main page
+            token="YOUR-APPLICATION-TOKEN",                                           # Create a application on the website, and use the token shown in your application
             priority=0,                                                               # Read more about priority here: https://pushover.net/api#priority
             sound="pushover",                                                         # A list of sounds can be found here: https://pushover.net/api#sounds
-            events=[Events.CHAT_MENTION, Events.DROP_CLAIM],                          # Only these events will be sent.
+            events=[Events.CHAT_MENTION, Events.DROP_CLAIM],                          # Only these events will be sent
         )
     ),
     streamer_settings=StreamerSettings(
@@ -74,6 +81,19 @@ twitch_miner = TwitchChannelPointsMiner(
         claim_moments=True,                     # If set to True, https://help.twitch.tv/s/article/moments will be claimed when available
         watch_streak=True,                      # If a streamer go online change the priority of streamers array and catch the watch screak. Issue #11
         chat=ChatPresence.ONLINE,               # Join irc chat to increase watch-time [ALWAYS, NEVER, ONLINE, OFFLINE]
+        bet=BetSettings(
+            strategy=Strategy.SMART,            # Choose you strategy!
+            percentage=5,                       # Place the x% of your channel points
+            percentage_gap=20,                  # Gap difference between outcomesA and outcomesB (for SMART strategy)
+            max_points=50000,                   # If the x percentage of your channel points is gt bet_max_points set this value
+            stealth_mode=True,                  # If the calculated amount of channel points is GT the highest bet, place the highest value minus 1-2 points Issue #33
+            delay_mode=DelayMode.FROM_END,      # When placing a bet, we will wait until `delay` seconds before the end of the timer
+            delay=6,
+            minimum_points=20000,               # Place the bet only if we have at least 20k points. Issue #113
+            filter_condition=FilterCondition(
+                by=OutcomeKeys.TOTAL_USERS,     # Where apply the filter. Allowed [PERCENTAGE_USERS, ODDS_PERCENTAGE, ODDS, TOP_POINTS, TOTAL_USERS, TOTAL_POINTS]
+                where=Condition.LTE,            # 'by' must be [GT, LT, GTE, LTE] than value
+                value=800
             )
         )
     )
